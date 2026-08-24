@@ -1,0 +1,13 @@
+# Terraform local state and cache — never commit these
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+*.tfplan
+
+# tfvars may contain secrets — commit only .tfvars.example files
+*.tfvars
+!*.tfvars.example
+
+# OS
+.DS_Store
