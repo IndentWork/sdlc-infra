@@ -1,0 +1,94 @@
+name: SDLC Infra Destroy
+
+# Manually triggered — select environment before running.
+# Flow: plan-destroy runs first showing what will be deleted → human reviews → approves → destroy runs.
+# WARNING: This will permanently delete all Azure resources in the selected environment.
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment to destroy"
+        required: true
+        type: choice
+        options:
+          - DEV
+          - PROD
+
+jobs:
+  plan-destroy:
+    name: "Terraform Plan Destroy (${{ inputs.env }})"
+    runs-on: ubuntu-latest
+
+    env:
+      ARM_CLIENT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_ID_TERRAFORM', inputs.env)] }}
+      ARM_CLIENT_SECRET:   ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_SECRET_TERRAFORM', inputs.env)] }}
+      ARM_TENANT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_TENANT_ID_TERRAFORM', inputs.env)] }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Set lowercase env
+        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform init
+
+      # -destroy flag shows exactly what will be deleted — nothing is destroyed yet.
+      - name: Terraform Plan Destroy
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform plan -destroy -out=tfplan-destroy
+
+      - name: Upload destroy plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-destroy-${{ inputs.env }}
+          path: environments/${{ env.ENV_LOWER }}/tfplan-destroy
+          retention-days: 1
+
+  destroy:
+    name: "Terraform Destroy (${{ inputs.env }})"
+    needs: plan-destroy
+    runs-on: ubuntu-latest
+
+    # Same approval gate as apply — must be approved before destroy runs.
+    environment: apply
+
+    env:
+      ARM_CLIENT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_ID_TERRAFORM', inputs.env)] }}
+      ARM_CLIENT_SECRET:   ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_SECRET_TERRAFORM', inputs.env)] }}
+      ARM_TENANT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_TENANT_ID_TERRAFORM', inputs.env)] }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Set lowercase env
+        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform init
+
+      - name: Download destroy plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-destroy-${{ inputs.env }}
+          path: environments/${{ env.ENV_LOWER }}
+
+      - name: Terraform Destroy
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform apply -auto-approve tfplan-destroy
