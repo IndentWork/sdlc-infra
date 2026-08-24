@@ -1,6 +1,7 @@
 name: SDLC Infra Terraform
 
-# Manually triggered — select environment and action before running.
+# Manually triggered — select environment before running.
+# Flow: plan runs first → human reviews → approves → apply runs.
 on:
   workflow_dispatch:
     inputs:
@@ -13,13 +14,10 @@ on:
           - PROD
 
 jobs:
-  terraform:
-    name: "Terraform plan → apply (${{ inputs.env }})"
+  plan:
+    name: "Terraform Plan (${{ inputs.env }})"
     runs-on: ubuntu-latest
 
-    # ARM_* credentials are looked up dynamically using the uppercase ENV input.
-    # SDLC_DEV_AZURE_CLIENT_ID_TERRAFORM / SDLC_PROD_AZURE_CLIENT_ID_TERRAFORM
-    # are org-level secrets — no duplication, no conditional steps.
     env:
       ARM_CLIENT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_ID_TERRAFORM', inputs.env)] }}
       ARM_CLIENT_SECRET:   ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_SECRET_TERRAFORM', inputs.env)] }}
@@ -35,8 +33,6 @@ jobs:
         with:
           terraform_version: "~1.7"
 
-      # Folder paths are lowercase (environments/dev) but inputs.env is uppercase (DEV).
-      # Convert once here and reuse ${{ env.ENV_LOWER }} in all subsequent steps.
       - name: Set lowercase env
         run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
@@ -44,10 +40,60 @@ jobs:
         working-directory: environments/${{ env.ENV_LOWER }}
         run: terraform init
 
+      # Save plan output to a file — apply job downloads and runs exactly this plan.
+      # This ensures apply runs what was reviewed, not a fresh plan that may have drifted.
       - name: Terraform Plan
         working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform plan
+        run: terraform plan -out=tfplan
 
+      # Upload the plan file so the apply job can download and use it.
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.env }}
+          path: environments/${{ env.ENV_LOWER }}/tfplan
+          retention-days: 1
+
+  apply:
+    name: "Terraform Apply (${{ inputs.env }})"
+    needs: plan
+    runs-on: ubuntu-latest
+
+    # This GitHub Environment must have a required reviewer configured in repo settings.
+    # GitHub will pause here and show an approval button — apply only runs after approval.
+    # Setup: IndentWork/sdlc-infra → Settings → Environments → apply → add required reviewer.
+    environment: apply
+
+    env:
+      ARM_CLIENT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_ID_TERRAFORM', inputs.env)] }}
+      ARM_CLIENT_SECRET:   ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_SECRET_TERRAFORM', inputs.env)] }}
+      ARM_TENANT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_TENANT_ID_TERRAFORM', inputs.env)] }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Set lowercase env
+        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform init
+
+      # Download the exact plan file generated in the plan job.
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ inputs.env }}
+          path: environments/${{ env.ENV_LOWER }}
+
+      # Apply exactly what was planned — no surprises.
       - name: Terraform Apply
         working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
