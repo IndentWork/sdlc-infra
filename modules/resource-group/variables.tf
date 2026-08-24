@@ -7,7 +7,7 @@
 #   "<org_code>" → rg-sdlc-abc123-dev     (dedicated tenant — one RG per tenant)
 
 variable "scope" {
-  description = "Scope of this resource group: base, shared, or a tenant org_code."
+  description = "Scope of this resource. Possible values: 'base' (management plane), 'shared' (shared tenant resources), or a tenant org_code (e.g. 'abc123') for dedicated tenants."
   type        = string
 }
 

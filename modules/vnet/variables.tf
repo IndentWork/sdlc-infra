@@ -6,7 +6,7 @@
 # Callers pass subnets as a map so this module works for base, shared, and private scopes.
 
 variable "scope" {
-  description = "Scope: base, shared, or a tenant org_code. Used in resource name."
+  description = "Scope of this resource. Possible values: 'base' (management plane), 'shared' (shared tenant resources), or a tenant org_code (e.g. 'abc123') for dedicated tenants."
   type        = string
 }
 

@@ -12,6 +12,11 @@ variable "location" {
   type        = string
 }
 
+variable "tenant_id" {
+  description = "Azure AD tenant ID — passed to Key Vault."
+  type        = string
+}
+
 variable "tags" {
   description = "Tags applied to all resources in this environment."
   type        = map(string)

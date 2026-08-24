@@ -11,6 +11,43 @@ module "resource_group" {
   tags     = var.tags
 }
 
+module "keyvault" {
+  source              = "../../modules/keyvault"
+  scope               = "base"
+  env                 = var.env
+  location            = var.location
+  resource_group_name = module.resource_group.name
+  tenant_id           = var.tenant_id
+  tags                = var.tags
+}
+
+module "managed_identity" {
+  source              = "../../modules/managed-identity"
+  scope               = "base"
+  env                 = var.env
+  location            = var.location
+  resource_group_name = module.resource_group.name
+  tags                = var.tags
+}
+
+# Grant FastAPI Managed Identity read access to Key Vault secrets.
+# Key Vault Secrets User = read only — FastAPI can get secrets but cannot create or delete them.
+resource "azurerm_role_assignment" "fastapi_keyvault" {
+  scope                = module.keyvault.vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = module.managed_identity.principal_id
+}
+
+# Grant Terraform SP Secrets Officer access so it can write secrets (e.g. DB password) to Key Vault.
+# Uses the current SP identity running the pipeline — data source reads it automatically.
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_role_assignment" "terraform_keyvault" {
+  scope                = module.keyvault.vault_id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 module "vnet" {
   source              = "../../modules/vnet"
   scope               = "base"
