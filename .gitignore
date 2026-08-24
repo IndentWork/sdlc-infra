@@ -5,8 +5,10 @@ terraform.tfstate
 terraform.tfstate.backup
 *.tfplan
 
-# tfvars may contain secrets — commit only .tfvars.example files
-*.tfvars
+# terraform.tfvars may contain secrets — gitignored
+# terraform.auto.tfvars holds non-sensitive env config and IS committed
+terraform.tfvars
+!terraform.auto.tfvars
 !*.tfvars.example
 
 # OS

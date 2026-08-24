@@ -12,11 +12,6 @@ variable "location" {
   type        = string
 }
 
-variable "subscription_id" {
-  description = "Azure subscription ID."
-  type        = string
-}
-
 variable "tags" {
   description = "Tags applied to all resources in this environment."
   type        = map(string)

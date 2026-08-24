@@ -26,7 +26,8 @@ terraform {
 # The azurerm provider authenticates using the Terraform SP credentials
 # set as GitHub org secrets (SDLC_DEV_AZURE_*_TERRAFORM).
 # When running locally, these must be exported as ARM_* environment variables.
+# subscription_id is not set here — the provider reads it automatically from
+# ARM_SUBSCRIPTION_ID environment variable set by the pipeline (or set_env.sh locally).
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id
 }
