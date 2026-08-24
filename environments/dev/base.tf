@@ -48,6 +48,41 @@ resource "azurerm_role_assignment" "terraform_keyvault" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+# Generate a random password for the PostgreSQL server admin.
+# This is the emergency-only admin — FastAPI never uses this password.
+# The password is stored in Key Vault immediately after generation.
+resource "random_password" "postgres_admin" {
+  length           = 32
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+# Store the admin password in Key Vault so admins can retrieve it for emergency access.
+resource "azurerm_key_vault_secret" "postgres_admin_password" {
+  name         = "postgres-admin-password"
+  value        = random_password.postgres_admin.result
+  key_vault_id = module.keyvault.vault_id
+
+  depends_on = [azurerm_role_assignment.terraform_keyvault]
+}
+
+module "postgres" {
+  source              = "../../modules/postgres"
+  scope               = "base"
+  env                 = var.env
+  location            = var.location
+  resource_group_name = module.resource_group.name
+  subnet_id           = module.vnet.subnet_ids["snet-sdlc-base-${var.env}-postgres"]
+  vnet_id             = module.vnet.vnet_id
+  admin_password      = random_password.postgres_admin.result
+
+  tenant_id                     = var.tenant_id
+  managed_identity_principal_id = module.managed_identity.principal_id
+  managed_identity_client_id    = module.managed_identity.client_id
+
+  tags = var.tags
+}
+
 module "vnet" {
   source              = "../../modules/vnet"
   scope               = "base"

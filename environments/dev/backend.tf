@@ -20,6 +20,11 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }
+    # random provider generates the PostgreSQL admin password — stored in Key Vault immediately.
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
