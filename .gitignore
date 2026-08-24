@@ -5,11 +5,8 @@ terraform.tfstate
 terraform.tfstate.backup
 *.tfplan
 
-# terraform.tfvars may contain secrets — gitignored
-# terraform.auto.tfvars holds non-sensitive env config and IS committed
-terraform.tfvars
-!terraform.auto.tfvars
-!*.tfvars.example
+# All variable values live in terraform.auto.tfvars which is committed.
+# No sensitive values in tfvars — subscription_id comes from ARM_SUBSCRIPTION_ID env var.
 
 # OS
 .DS_Store

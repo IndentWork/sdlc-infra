@@ -1,9 +1,0 @@
-env             = "dev"
-location        = "centralindia"
-subscription_id = "your-azure-subscription-id"
-
-tags = {
-  environment = "dev"
-  project     = "sdlc-platform"
-  managed_by  = "terraform"
-}
