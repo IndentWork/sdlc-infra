@@ -11,17 +11,10 @@ on:
         options:
           - DEV
           - PROD
-      action:
-        description: "Terraform action to run"
-        required: true
-        type: choice
-        options:
-          - plan
-          - apply
 
 jobs:
   terraform:
-    name: "Terraform ${{ inputs.action }} (${{ inputs.env }})"
+    name: "Terraform plan → apply (${{ inputs.env }})"
     runs-on: ubuntu-latest
 
     # ARM_* credentials are looked up dynamically using the uppercase ENV input.
@@ -55,8 +48,6 @@ jobs:
         working-directory: environments/${{ env.ENV_LOWER }}
         run: terraform plan
 
-      # Apply only runs when explicitly selected — never runs on plan-only triggers.
       - name: Terraform Apply
-        if: inputs.action == 'apply'
         working-directory: environments/${{ env.ENV_LOWER }}
         run: terraform apply -auto-approve
