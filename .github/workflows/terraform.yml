@@ -1,0 +1,62 @@
+name: SDLC Infra Terraform
+
+# Manually triggered — select environment and action before running.
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Environment to target"
+        required: true
+        type: choice
+        options:
+          - DEV
+          - PROD
+      action:
+        description: "Terraform action to run"
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+
+jobs:
+  terraform:
+    name: "Terraform ${{ inputs.action }} (${{ inputs.env }})"
+    runs-on: ubuntu-latest
+
+    # ARM_* credentials are looked up dynamically using the uppercase ENV input.
+    # SDLC_DEV_AZURE_CLIENT_ID_TERRAFORM / SDLC_PROD_AZURE_CLIENT_ID_TERRAFORM
+    # are org-level secrets — no duplication, no conditional steps.
+    env:
+      ARM_CLIENT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_ID_TERRAFORM', inputs.env)] }}
+      ARM_CLIENT_SECRET:   ${{ secrets[format('SDLC_{0}_AZURE_CLIENT_SECRET_TERRAFORM', inputs.env)] }}
+      ARM_TENANT_ID:       ${{ secrets[format('SDLC_{0}_AZURE_TENANT_ID_TERRAFORM', inputs.env)] }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      # Folder paths are lowercase (environments/dev) but inputs.env is uppercase (DEV).
+      # Convert once here and reuse ${{ env.ENV_LOWER }} in all subsequent steps.
+      - name: Set lowercase env
+        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform plan
+
+      # Apply only runs when explicitly selected — never runs on plan-only triggers.
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ env.ENV_LOWER }}
+        run: terraform apply -auto-approve
