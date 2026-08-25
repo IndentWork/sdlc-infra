@@ -7,7 +7,7 @@
 ENV=${1:-dev}
 ENV_UPPER=$(echo "$ENV" | tr '[:lower:]' '[:upper:]')
 # BASH_SOURCE[0] gives the script path even when sourced — $0 gives the shell name when sourced
-ENV_FILE="$(dirname "${BASH_SOURCE[0]}")/../sdlc_bootstrap/.env"
+ENV_FILE="$(dirname "${BASH_SOURCE[0]}")/../../sdlc_bootstrap/.env"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo "ERROR: .env file not found at $ENV_FILE"

@@ -83,6 +83,15 @@ module "postgres" {
   tags = var.tags
 }
 
+module "container_registry" {
+  source                        = "../../modules/container-registry"
+  env                           = var.env
+  location                      = var.location
+  resource_group_name           = module.resource_group.name
+  managed_identity_principal_id = module.managed_identity.principal_id
+  tags                          = var.tags
+}
+
 module "vnet" {
   source              = "../../modules/vnet"
   scope               = "base"
