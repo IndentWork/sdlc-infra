@@ -83,6 +83,23 @@ module "postgres" {
   tags = var.tags
 }
 
+module "container_app" {
+  source              = "../../modules/container-app"
+  scope               = "base"
+  env                 = var.env
+  location            = var.location
+  resource_group_name = module.resource_group.name
+  subnet_id           = module.vnet.subnet_ids["snet-sdlc-base-${var.env}-container-app"]
+
+  managed_identity_id        = module.managed_identity.id
+  managed_identity_client_id = module.managed_identity.client_id
+
+  postgres_host = module.postgres.hostname
+  key_vault_uri = module.keyvault.vault_uri
+
+  tags = var.tags
+}
+
 module "container_registry" {
   source                        = "../../modules/container-registry"
   env                           = var.env
