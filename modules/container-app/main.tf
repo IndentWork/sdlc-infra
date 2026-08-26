@@ -47,6 +47,13 @@ resource "azurerm_container_app" "this" {
     identity_ids = [var.managed_identity_id]
   }
 
+  # Tell the Container App to pull images from ACR using the Managed Identity.
+  # Without this block, the Container App defaults to anonymous pulls and fails on private ACR.
+  registry {
+    server   = var.acr_login_server
+    identity = var.managed_identity_id
+  }
+
   # Public ingress on port 8000 — FastAPI default port.
   # This is the only public-facing resource in the entire platform.
   ingress {

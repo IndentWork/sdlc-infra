@@ -94,8 +94,9 @@ module "container_app" {
   managed_identity_id        = module.managed_identity.id
   managed_identity_client_id = module.managed_identity.client_id
 
-  postgres_host = module.postgres.hostname
-  key_vault_uri = module.keyvault.vault_uri
+  acr_login_server = module.container_registry.login_server
+  postgres_host    = module.postgres.hostname
+  key_vault_uri    = module.keyvault.vault_uri
 
   tags = var.tags
 }

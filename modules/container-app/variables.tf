@@ -54,6 +54,11 @@ variable "key_vault_uri" {
   type        = string
 }
 
+variable "acr_login_server" {
+  description = "Container Registry login server (e.g. crsdlcdev.azurecr.io) — used for image pulls via Managed Identity."
+  type        = string
+}
+
 variable "image" {
   description = "Container image to deploy. Defaults to placeholder — real image deployed by control-plane pipeline via az containerapp update."
   type        = string
