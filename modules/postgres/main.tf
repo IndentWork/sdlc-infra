@@ -77,3 +77,12 @@ resource "azurerm_postgresql_flexible_server_active_directory_administrator" "th
   principal_name      = "id-sdlc-${var.scope}-${var.env}"
   principal_type      = "ServicePrincipal"
 }
+
+# The application database — FastAPI and Alembic connect to this.
+# PostgreSQL only creates the default 'postgres' DB — we must create 'sdlc' explicitly.
+resource "azurerm_postgresql_flexible_server_database" "sdlc" {
+  name      = "sdlc"
+  server_id = azurerm_postgresql_flexible_server.this.id
+  charset   = "UTF8"
+  collation = "en_US.utf8"
+}

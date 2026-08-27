@@ -16,3 +16,8 @@ output "server_id" {
   description = "Resource ID of the PostgreSQL server."
   value       = azurerm_postgresql_flexible_server.this.id
 }
+
+output "database_name" {
+  description = "Name of the application database that FastAPI connects to."
+  value       = azurerm_postgresql_flexible_server_database.sdlc.name
+}
