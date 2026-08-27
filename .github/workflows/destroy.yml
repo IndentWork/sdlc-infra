@@ -89,6 +89,37 @@ jobs:
           name: tfplan-destroy-${{ inputs.env }}
           path: environments/${{ env.ENV_LOWER }}
 
+      # WORKAROUND for Azure API bug — the PostgreSQL AD administrator delete via ARM
+      # takes 30-60 min or times out. Pre-deleting via `az rest` returns 202 immediately;
+      # Terraform then sees 404 and marks the resource destroyed without polling.
+      # If the resource doesn't exist yet (e.g. server never provisioned), the CLI errors
+      # are ignored — the destroy proceeds normally either way.
+      - name: Azure Login (for pre-destroy cleanup)
+        run: |
+          az login --service-principal \
+            --username "$ARM_CLIENT_ID" \
+            --password "$ARM_CLIENT_SECRET" \
+            --tenant "$ARM_TENANT_ID"
+          az account set --subscription "$ARM_SUBSCRIPTION_ID"
+
+      - name: Pre-delete PostgreSQL AD administrator (workaround)
+        continue-on-error: true
+        run: |
+          SERVER="psql-sdlc-base-${{ env.ENV_LOWER }}"
+          RG="rg-sdlc-base-${{ env.ENV_LOWER }}"
+
+          echo "Listing AD administrators on $SERVER..."
+          ADMINS=$(az rest --method get \
+            --url "/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$RG/providers/Microsoft.DBforPostgreSQL/flexibleServers/$SERVER/administrators?api-version=2023-03-01-preview" \
+            --query "value[].properties.objectId" -o tsv 2>/dev/null || echo "")
+
+          for OID in $ADMINS; do
+            echo "Deleting AD admin $OID..."
+            az rest --method delete \
+              --url "/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$RG/providers/Microsoft.DBforPostgreSQL/flexibleServers/$SERVER/administrators/$OID?api-version=2023-03-01-preview" \
+              --output none 2>/dev/null || echo "AD admin $OID already deleted or server not found"
+          done
+
       - name: Terraform Destroy
         working-directory: environments/${{ env.ENV_LOWER }}
         run: terraform apply -auto-approve tfplan-destroy
