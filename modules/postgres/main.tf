@@ -69,6 +69,9 @@ resource "azurerm_postgresql_flexible_server" "this" {
 
 # Set the Managed Identity as the Azure AD administrator of the PostgreSQL server.
 # This is what allows FastAPI to connect using a token instead of a password.
+#
+# NOTE: Deletion of this resource via ARM is notoriously slow (30-90+ min).
+# The destroy pipeline bypasses this by deleting the entire resource group directly.
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "this" {
   server_name         = azurerm_postgresql_flexible_server.this.name
   resource_group_name = var.resource_group_name
