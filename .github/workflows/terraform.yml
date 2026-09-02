@@ -50,9 +50,18 @@ jobs:
       - name: Terraform Plan
         working-directory: environments
         run: |
-          terraform plan \
-            -var-file="environments/${{ env.ENV_LOWER }}/${{ inputs.scope }}.tfvars" \
-            -out=tfplan
+          if [ "${{ inputs.scope }}" = "base" ]; then
+            terraform plan \
+              -var-file="environments/${{ env.ENV_LOWER }}/base.tfvars" \
+              -out=tfplan
+          else
+            # shared and dedicated both load common.tfvars first,
+            # then the scope-specific file overrides any value from common.
+            terraform plan \
+              -var-file="environments/${{ env.ENV_LOWER }}/common.tfvars" \
+              -var-file="environments/${{ env.ENV_LOWER }}/${{ inputs.scope }}.tfvars" \
+              -out=tfplan
+          fi
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4

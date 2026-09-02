@@ -1,9 +1,6 @@
-# Shared scope — dev environment values.
-# Used with: terraform apply -var-file=environments/dev/shared.tfvars -backend-config="key=shared.tfstate"
-
-env       = "dev"
-location  = "centralindia"
-tenant_id = "8b574092-a70d-49ac-89dc-d754d40b400d"
+# Shared scope overrides — dev environment.
+# Loaded after common.tfvars. Any value here overrides the common default.
+# Used with: -var-file=common.tfvars -var-file=shared.tfvars -backend-config="key=shared.tfstate"
 
 tags = {
   environment = "dev"
