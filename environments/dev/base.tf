@@ -57,6 +57,14 @@ resource "random_password" "postgres_admin" {
   override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
+# Import block — adopts the existing secret if it already exists in Azure but not in state.
+# This happens when infra is destroyed and re-applied: state is cleared but KV soft-delete
+# keeps the secret alive. On the next apply, Terraform imports it then updates the value.
+import {
+  to = azurerm_key_vault_secret.postgres_admin_password
+  id = "https://kv-sdlc-base-dev.vault.azure.net/secrets/postgres-admin-password/e73e3bfe4090410da114d4e27f4bcce5"
+}
+
 # Store the admin password in Key Vault so admins can retrieve it for emergency access.
 resource "azurerm_key_vault_secret" "postgres_admin_password" {
   name         = "postgres-admin-password"
