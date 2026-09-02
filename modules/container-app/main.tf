@@ -32,6 +32,13 @@ resource "azurerm_container_app_environment" "this" {
   resource_group_name        = var.resource_group_name
   infrastructure_subnet_id   = var.subnet_id
   tags                       = var.tags
+
+  # Azure auto-creates a companion ME_* resource group for the Container App Environment.
+  # Terraform does not set this field but Azure writes it into state — ignore to prevent
+  # forced replacement on every plan.
+  lifecycle {
+    ignore_changes = [infrastructure_resource_group_name]
+  }
 }
 
 resource "azurerm_container_app" "this" {

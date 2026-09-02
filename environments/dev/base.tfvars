@@ -9,5 +9,4 @@ tags = {
   environment = "dev"
   project     = "sdlc-platform"
   managed_by  = "terraform"
-  scope       = "base"
 }
