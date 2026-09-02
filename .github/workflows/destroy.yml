@@ -1,12 +1,11 @@
 name: SDLC Infra Destroy
 
-# Manually triggered — select environment before running.
-# Strategy (pragmatic): delete the resource group directly via `az`, then clean
-# Terraform state so it matches reality. This bypasses the notoriously slow
-# `azurerm_postgresql_flexible_server_active_directory_administrator` delete
-# (30-90+ min via ARM). Total destroy time: ~5 min instead of 30+.
+# Manually triggered — select environment and scope before running.
+# Strategy: delete the resource group directly via az, then clean Terraform state.
+# This bypasses the notoriously slow azurerm_postgresql_flexible_server_active_directory_administrator
+# delete (30-90+ min via ARM). Total destroy time: ~5 min instead of 30+.
 #
-# WARNING: This will permanently delete all Azure resources in the selected environment.
+# WARNING: This will permanently delete all Azure resources for the selected scope.
 on:
   workflow_dispatch:
     inputs:
@@ -17,10 +16,15 @@ on:
         options:
           - DEV
           - PROD
+      scope:
+        description: "Scope to destroy — 'base', 'shared', or a dedicated tenant resource_code (e.g. a3f1c2b4)"
+        required: true
+        type: string
+        default: "base"
 
 jobs:
   plan-destroy:
-    name: "Plan Destroy (${{ inputs.env }})"
+    name: "Plan Destroy (${{ inputs.env }} / ${{ inputs.scope }})"
     runs-on: ubuntu-latest
 
     env:
@@ -42,26 +46,25 @@ jobs:
         run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Terraform Init
-        working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform init
+        working-directory: environments
+        run: |
+          terraform init \
+            -backend-config="key=${{ inputs.scope }}.tfstate"
 
-      # Shows what Azure resources exist in state right now — human review this
-      # before approving the destroy job.
       - name: List resources to be destroyed
-        working-directory: environments/${{ env.ENV_LOWER }}
+        working-directory: environments
         run: |
           echo "=== Resources in Terraform state ==="
           terraform state list
           echo ""
           echo "=== Resource group to be deleted ==="
-          echo "rg-sdlc-base-${{ env.ENV_LOWER }}"
+          echo "rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
 
   destroy:
-    name: "Destroy (${{ inputs.env }})"
+    name: "Destroy (${{ inputs.env }} / ${{ inputs.scope }})"
     needs: plan-destroy
     runs-on: ubuntu-latest
 
-    # Manual approval required — configure in repo Settings → Environments → apply
     environment: apply
 
     env:
@@ -83,8 +86,10 @@ jobs:
         run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Terraform Init
-        working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform init
+        working-directory: environments
+        run: |
+          terraform init \
+            -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: Azure Login
         run: |
@@ -94,13 +99,9 @@ jobs:
             --tenant "$ARM_TENANT_ID"
           az account set --subscription "$ARM_SUBSCRIPTION_ID"
 
-      # Nuke the resource group. Azure handles ordering internally — much faster
-      # than Terraform's per-resource polling. Explicitly check existence first so
-      # a missing RG is a clean "nothing to do", not an error.
-      # Also delete companion RGs auto-created by Container Apps Environment (ME_*).
       - name: Force delete resource groups
         run: |
-          RG="rg-sdlc-base-${{ env.ENV_LOWER }}"
+          RG="rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
 
           if az group show --name "$RG" --output none 2>/dev/null; then
             echo "Deleting $RG..."
@@ -110,9 +111,8 @@ jobs:
             echo "$RG does not exist — skipping"
           fi
 
-          # Container Apps auto-creates a companion RG named ME_<cae>_<rg>_<region>
-          # — must be deleted separately since Terraform doesn't manage it
-          orphans=$(az group list --query "[?starts_with(name, 'ME_cae-sdlc-base-${{ env.ENV_LOWER }}')].name" -o tsv)
+          # Container Apps auto-creates a companion ME_* resource group — delete if present
+          orphans=$(az group list --query "[?starts_with(name, 'ME_cae-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}')].name" -o tsv)
           if [ -n "$orphans" ]; then
             for orphan in $orphans; do
               echo "Deleting orphan: $orphan"
@@ -122,19 +122,14 @@ jobs:
             echo "No orphan ME_* resource groups"
           fi
 
-      # Sync Terraform state with reality — remove every resource from state so the
-      # next `apply` starts clean. This is faster and safer than running
-      # `terraform destroy` which would try to DELETE each resource that no longer exists.
       - name: Clean Terraform state
-        working-directory: environments/${{ env.ENV_LOWER }}
+        working-directory: environments
         run: |
           echo "=== Resources to remove from state ==="
           terraform state list
 
           echo ""
           echo "=== Removing each resource from state ==="
-          # `terraform state list` prints one resource per line;
-          # xargs feeds them to `terraform state rm` one by one
           terraform state list | while read -r resource; do
             echo "Removing: $resource"
             terraform state rm "$resource" || true

@@ -1,6 +1,6 @@
 name: SDLC Infra Terraform
 
-# Manually triggered — select environment before running.
+# Manually triggered — select environment and scope before running.
 # Flow: plan runs first → human reviews → approves → apply runs.
 on:
   workflow_dispatch:
@@ -12,10 +12,15 @@ on:
         options:
           - DEV
           - PROD
+      scope:
+        description: "Scope to apply — 'base', 'shared', or a dedicated tenant resource_code (e.g. a3f1c2b4)"
+        required: true
+        type: string
+        default: "base"
 
 jobs:
   plan:
-    name: "Terraform Plan (${{ inputs.env }})"
+    name: "Terraform Plan (${{ inputs.env }} / ${{ inputs.scope }})"
     runs-on: ubuntu-latest
 
     env:
@@ -37,31 +42,30 @@ jobs:
         run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Terraform Init
-        working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform init
+        working-directory: environments
+        run: |
+          terraform init \
+            -backend-config="key=${{ inputs.scope }}.tfstate"
 
-      # Save plan output to a file — apply job downloads and runs exactly this plan.
-      # This ensures apply runs what was reviewed, not a fresh plan that may have drifted.
       - name: Terraform Plan
-        working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform plan -out=tfplan
+        working-directory: environments
+        run: |
+          terraform plan \
+            -var-file="environments/${{ env.ENV_LOWER }}/${{ inputs.scope }}.tfvars" \
+            -out=tfplan
 
-      # Upload the plan file so the apply job can download and use it.
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${{ inputs.env }}
-          path: environments/${{ env.ENV_LOWER }}/tfplan
+          name: tfplan-${{ inputs.env }}-${{ inputs.scope }}
+          path: environments/tfplan
           retention-days: 1
 
   apply:
-    name: "Terraform Apply (${{ inputs.env }})"
+    name: "Terraform Apply (${{ inputs.env }} / ${{ inputs.scope }})"
     needs: plan
     runs-on: ubuntu-latest
 
-    # This GitHub Environment must have a required reviewer configured in repo settings.
-    # GitHub will pause here and show an approval button — apply only runs after approval.
-    # Setup: IndentWork/sdlc-infra → Settings → Environments → apply → add required reviewer.
     environment: apply
 
     env:
@@ -83,17 +87,17 @@ jobs:
         run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
       - name: Terraform Init
-        working-directory: environments/${{ env.ENV_LOWER }}
-        run: terraform init
+        working-directory: environments
+        run: |
+          terraform init \
+            -backend-config="key=${{ inputs.scope }}.tfstate"
 
-      # Download the exact plan file generated in the plan job.
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-${{ inputs.env }}
-          path: environments/${{ env.ENV_LOWER }}
+          name: tfplan-${{ inputs.env }}-${{ inputs.scope }}
+          path: environments
 
-      # Apply exactly what was planned — no surprises.
       - name: Terraform Apply
-        working-directory: environments/${{ env.ENV_LOWER }}
+        working-directory: environments
         run: terraform apply -auto-approve tfplan
