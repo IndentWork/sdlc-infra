@@ -28,3 +28,15 @@ variable "resource_code" {
   type        = string
   default     = ""
 }
+
+variable "vnet_cidr" {
+  description = "CIDR block for the shared or dedicated VNet. Not used by base.tf (base uses a hardcoded range)."
+  type        = string
+  default     = ""
+}
+
+variable "endpoint_subnet_cidr" {
+  description = "CIDR block for the private-endpoints subnet inside the shared or dedicated VNet."
+  type        = string
+  default     = ""
+}
