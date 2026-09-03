@@ -41,7 +41,7 @@ resource "azurerm_servicebus_queue" "repo_index" {
   max_delivery_count = 3
 
   # Retain messages for 7 days — failed indexing jobs can be retried or inspected.
-  default_message_time_to_live = "P7D"
+  default_message_ttl = "P7D"
 }
 
 # Grant the managed identity Sender role — FastAPI enqueues repo-index messages here.
