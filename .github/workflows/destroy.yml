@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       env:
-        description: "Environment (dev, prod, qa)"
+        description: "Environment"
         required: true
         type: choice
         options:
-          - dev
-          - prod
+          - DEV
+          - PROD
       scope:
         description: "Scope to destroy — 'base', 'shared', or a dedicated tenant resource_code (e.g. a3f1c2b4)"
         required: true
@@ -34,8 +34,9 @@ jobs:
         with:
           terraform_version: "~1.7"
 
-      - name: Set scope directory
+      - name: Set env vars
         run: |
+          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
             echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
           else
@@ -52,7 +53,7 @@ jobs:
           echo "=== Resources in Terraform state ==="
           terraform state list
           echo "=== Resource group to be deleted ==="
-          echo "rg-sdlc-${{ inputs.scope }}-${{ inputs.env }}"
+          echo "rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
 
   destroy:
     name: "Destroy (${{ inputs.env }} / ${{ inputs.scope }})"
@@ -73,8 +74,9 @@ jobs:
         with:
           terraform_version: "~1.7"
 
-      - name: Set scope directory
+      - name: Set env vars
         run: |
+          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
             echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
           else
@@ -95,7 +97,7 @@ jobs:
 
       - name: Force delete resource groups
         run: |
-          RG="rg-sdlc-${{ inputs.scope }}-${{ inputs.env }}"
+          RG="rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
           if az group show --name "$RG" --output none 2>/dev/null; then
             echo "Deleting $RG..."
             az group delete --name "$RG" --yes --output none
