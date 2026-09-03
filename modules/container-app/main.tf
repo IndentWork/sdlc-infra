@@ -48,6 +48,12 @@ resource "azurerm_container_app" "this" {
   revision_mode                = "Single"
   tags                         = var.tags
 
+  # The deploy pipeline updates the image after Terraform creates the Container App.
+  # Ignore template changes so Terraform never reverts the image back to the placeholder.
+  lifecycle {
+    ignore_changes = [template]
+  }
+
   # Attach the Managed Identity so the app authenticates to Azure services without credentials.
   identity {
     type         = "UserAssigned"
