@@ -6,7 +6,7 @@
 #                             -backend-config="key=shared.tfstate"
 
 module "resource_group" {
-  source   = "../../modules/resource-group"
+  source   = "../../../modules/resource-group"
   scope    = "shared"
   env      = var.env
   location = var.location
@@ -14,7 +14,7 @@ module "resource_group" {
 }
 
 module "vnet" {
-  source              = "../../modules/vnet"
+  source              = "../../../modules/vnet"
   scope               = "shared"
   env                 = var.env
   location            = var.location
@@ -33,7 +33,7 @@ module "vnet" {
 }
 
 module "managed_identity" {
-  source              = "../../modules/managed-identity"
+  source              = "../../../modules/managed-identity"
   scope               = "shared"
   env                 = var.env
   location            = var.location
@@ -42,7 +42,7 @@ module "managed_identity" {
 }
 
 module "keyvault" {
-  source              = "../../modules/keyvault"
+  source              = "../../../modules/keyvault"
   scope               = "shared"
   env                 = var.env
   location            = var.location
@@ -52,7 +52,7 @@ module "keyvault" {
 }
 
 module "service_bus" {
-  source              = "../../modules/service-bus"
+  source              = "../../../modules/service-bus"
   scope               = "shared"
   env                 = var.env
   location            = var.location
@@ -63,7 +63,7 @@ module "service_bus" {
 }
 
 module "storage" {
-  source              = "../../modules/storage"
+  source              = "../../../modules/storage"
   scope               = "shared"
   env                 = var.env
   location            = var.location

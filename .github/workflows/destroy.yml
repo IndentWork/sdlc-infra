@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       env:
-        description: "Environment to destroy"
+        description: "Environment (dev, prod, qa)"
         required: true
         type: choice
         options:
-          - DEV
-          - PROD
+          - dev
+          - prod
       scope:
         description: "Scope to destroy — 'base', 'shared', or a dedicated tenant resource_code (e.g. a3f1c2b4)"
         required: true
@@ -34,9 +34,8 @@ jobs:
         with:
           terraform_version: "~1.7"
 
-      - name: Set env vars
+      - name: Set scope directory
         run: |
-          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
             echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
           else
@@ -44,16 +43,16 @@ jobs:
           fi
 
       - name: Terraform Init
-        working-directory: environments/${{ env.SCOPE_DIR }}
+        working-directory: environments/scope/${{ env.SCOPE_DIR }}
         run: terraform init -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: List resources to be destroyed
-        working-directory: environments/${{ env.SCOPE_DIR }}
+        working-directory: environments/scope/${{ env.SCOPE_DIR }}
         run: |
           echo "=== Resources in Terraform state ==="
           terraform state list
           echo "=== Resource group to be deleted ==="
-          echo "rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
+          echo "rg-sdlc-${{ inputs.scope }}-${{ inputs.env }}"
 
   destroy:
     name: "Destroy (${{ inputs.env }} / ${{ inputs.scope }})"
@@ -74,9 +73,8 @@ jobs:
         with:
           terraform_version: "~1.7"
 
-      - name: Set env vars
+      - name: Set scope directory
         run: |
-          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
           if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
             echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
           else
@@ -84,7 +82,7 @@ jobs:
           fi
 
       - name: Terraform Init
-        working-directory: environments/${{ env.SCOPE_DIR }}
+        working-directory: environments/scope/${{ env.SCOPE_DIR }}
         run: terraform init -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: Azure Login
@@ -97,17 +95,16 @@ jobs:
 
       - name: Force delete resource groups
         run: |
-          RG="rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
+          RG="rg-sdlc-${{ inputs.scope }}-${{ inputs.env }}"
           if az group show --name "$RG" --output none 2>/dev/null; then
             echo "Deleting $RG..."
             az group delete --name "$RG" --yes --output none
-            echo "$RG deleted"
           else
             echo "$RG does not exist — skipping"
           fi
 
       - name: Clean Terraform state
-        working-directory: environments/${{ env.SCOPE_DIR }}
+        working-directory: environments/scope/${{ env.SCOPE_DIR }}
         run: |
           terraform state list | while read -r resource; do
             echo "Removing: $resource"

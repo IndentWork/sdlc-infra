@@ -4,7 +4,7 @@
 # Apply with: terraform apply -var-file=environments/{env}/base.tfvars -backend-config="key=base.tfstate"
 
 module "resource_group" {
-  source   = "../../modules/resource-group"
+  source   = "../../../modules/resource-group"
   scope    = "base"
   env      = var.env
   location = var.location
@@ -12,7 +12,7 @@ module "resource_group" {
 }
 
 module "keyvault" {
-  source              = "../../modules/keyvault"
+  source              = "../../../modules/keyvault"
   scope               = "base"
   env                 = var.env
   location            = var.location
@@ -22,7 +22,7 @@ module "keyvault" {
 }
 
 module "managed_identity" {
-  source              = "../../modules/managed-identity"
+  source              = "../../../modules/managed-identity"
   scope               = "base"
   env                 = var.env
   location            = var.location
@@ -71,7 +71,7 @@ resource "azurerm_key_vault_secret" "postgres_admin_password" {
 }
 
 module "postgres" {
-  source              = "../../modules/postgres"
+  source              = "../../../modules/postgres"
   scope               = "base"
   env                 = var.env
   location            = var.location
@@ -88,7 +88,7 @@ module "postgres" {
 }
 
 module "container_app" {
-  source              = "../../modules/container-app"
+  source              = "../../../modules/container-app"
   scope               = "base"
   env                 = var.env
   location            = var.location
@@ -106,7 +106,7 @@ module "container_app" {
 }
 
 module "container_registry" {
-  source                        = "../../modules/container-registry"
+  source                        = "../../../modules/container-registry"
   env                           = var.env
   location                      = var.location
   resource_group_name           = module.resource_group.name
@@ -115,7 +115,7 @@ module "container_registry" {
 }
 
 module "vnet" {
-  source              = "../../modules/vnet"
+  source              = "../../../modules/vnet"
   scope               = "base"
   env                 = var.env
   location            = var.location

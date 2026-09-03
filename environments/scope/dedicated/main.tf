@@ -12,7 +12,7 @@
 #   endpoint_subnet_cidr = "10.2.1.0/24"
 
 module "resource_group" {
-  source   = "../../modules/resource-group"
+  source   = "../../../modules/resource-group"
   scope    = var.resource_code
   env      = var.env
   location = var.location
@@ -20,7 +20,7 @@ module "resource_group" {
 }
 
 module "vnet" {
-  source              = "../../modules/vnet"
+  source              = "../../../modules/vnet"
   scope               = var.resource_code
   env                 = var.env
   location            = var.location
@@ -38,7 +38,7 @@ module "vnet" {
 }
 
 module "managed_identity" {
-  source              = "../../modules/managed-identity"
+  source              = "../../../modules/managed-identity"
   scope               = var.resource_code
   env                 = var.env
   location            = var.location
@@ -47,7 +47,7 @@ module "managed_identity" {
 }
 
 module "keyvault" {
-  source              = "../../modules/keyvault"
+  source              = "../../../modules/keyvault"
   scope               = var.resource_code
   env                 = var.env
   location            = var.location
@@ -57,7 +57,7 @@ module "keyvault" {
 }
 
 module "service_bus" {
-  source              = "../../modules/service-bus"
+  source              = "../../../modules/service-bus"
   scope               = var.resource_code
   env                 = var.env
   location            = var.location
@@ -68,7 +68,7 @@ module "service_bus" {
 }
 
 module "storage" {
-  source              = "../../modules/storage"
+  source              = "../../../modules/storage"
   scope               = var.resource_code
   env                 = var.env
   location            = var.location
