@@ -1,11 +1,5 @@
 name: SDLC Infra Destroy
 
-# Manually triggered — select environment and scope before running.
-# Strategy: delete the resource group directly via az, then clean Terraform state.
-# This bypasses the notoriously slow azurerm_postgresql_flexible_server_active_directory_administrator
-# delete (30-90+ min via ARM). Total destroy time: ~5 min instead of 30+.
-#
-# WARNING: This will permanently delete all Azure resources for the selected scope.
 on:
   workflow_dispatch:
     inputs:
@@ -34,29 +28,30 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
 
-      - name: Set lowercase env
-        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Set env vars
+        run: |
+          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
+            echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
+          else
+            echo "SCOPE_DIR=dedicated" >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
-        working-directory: environments
-        run: |
-          terraform init \
-            -backend-config="key=${{ inputs.scope }}.tfstate"
+        working-directory: environments/${{ env.SCOPE_DIR }}
+        run: terraform init -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: List resources to be destroyed
-        working-directory: environments
+        working-directory: environments/${{ env.SCOPE_DIR }}
         run: |
           echo "=== Resources in Terraform state ==="
           terraform state list
-          echo ""
           echo "=== Resource group to be deleted ==="
           echo "rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
 
@@ -64,7 +59,6 @@ jobs:
     name: "Destroy (${{ inputs.env }} / ${{ inputs.scope }})"
     needs: plan-destroy
     runs-on: ubuntu-latest
-
     environment: apply
 
     env:
@@ -74,22 +68,24 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
 
-      - name: Set lowercase env
-        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Set env vars
+        run: |
+          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
+            echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
+          else
+            echo "SCOPE_DIR=dedicated" >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
-        working-directory: environments
-        run: |
-          terraform init \
-            -backend-config="key=${{ inputs.scope }}.tfstate"
+        working-directory: environments/${{ env.SCOPE_DIR }}
+        run: terraform init -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: Azure Login
         run: |
@@ -102,7 +98,6 @@ jobs:
       - name: Force delete resource groups
         run: |
           RG="rg-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}"
-
           if az group show --name "$RG" --output none 2>/dev/null; then
             echo "Deleting $RG..."
             az group delete --name "$RG" --yes --output none
@@ -111,30 +106,11 @@ jobs:
             echo "$RG does not exist — skipping"
           fi
 
-          # Container Apps auto-creates a companion ME_* resource group — delete if present
-          orphans=$(az group list --query "[?starts_with(name, 'ME_cae-sdlc-${{ inputs.scope }}-${{ env.ENV_LOWER }}')].name" -o tsv)
-          if [ -n "$orphans" ]; then
-            for orphan in $orphans; do
-              echo "Deleting orphan: $orphan"
-              az group delete --name "$orphan" --yes --output none
-            done
-          else
-            echo "No orphan ME_* resource groups"
-          fi
-
       - name: Clean Terraform state
-        working-directory: environments
+        working-directory: environments/${{ env.SCOPE_DIR }}
         run: |
-          echo "=== Resources to remove from state ==="
-          terraform state list
-
-          echo ""
-          echo "=== Removing each resource from state ==="
           terraform state list | while read -r resource; do
             echo "Removing: $resource"
             terraform state rm "$resource" || true
           done
-
-          echo ""
-          echo "=== Final state (should be empty) ==="
-          terraform state list || echo "State is empty"
+          echo "State cleared"

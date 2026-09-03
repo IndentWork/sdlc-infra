@@ -1,7 +1,5 @@
 name: SDLC Infra Terraform
 
-# Manually triggered — select environment and scope before running.
-# Flow: plan runs first → human reviews → approves → apply runs.
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +11,7 @@ on:
           - DEV
           - PROD
       scope:
-        description: "Scope to apply — 'base', 'shared', or a dedicated tenant resource_code (e.g. a3f1c2b4)"
+        description: "Scope — 'base', 'shared', or a dedicated tenant resource_code (e.g. a3f1c2b4)"
         required: true
         type: string
         default: "base"
@@ -30,36 +28,37 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
 
-      - name: Set lowercase env
-        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Set env vars
+        run: |
+          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          # Determine working directory based on scope
+          if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
+            echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
+          else
+            echo "SCOPE_DIR=dedicated" >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
-        working-directory: environments
-        run: |
-          terraform init \
-            -backend-config="key=${{ inputs.scope }}.tfstate"
+        working-directory: environments/${{ env.SCOPE_DIR }}
+        run: terraform init -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: Terraform Plan
-        working-directory: environments
+        working-directory: environments/${{ env.SCOPE_DIR }}
         run: |
           if [ "${{ inputs.scope }}" = "base" ]; then
             terraform plan \
-              -var-file="${{ env.ENV_LOWER }}/base.tfvars" \
+              -var-file="../${{ env.ENV_LOWER }}/base.tfvars" \
               -out=tfplan
           else
-            # shared and dedicated both load common.tfvars first,
-            # then the scope-specific file overrides any value from common.
             terraform plan \
-              -var-file="${{ env.ENV_LOWER }}/common.tfvars" \
-              -var-file="${{ env.ENV_LOWER }}/${{ inputs.scope }}.tfvars" \
+              -var-file="../${{ env.ENV_LOWER }}/common.tfvars" \
+              -var-file="../${{ env.ENV_LOWER }}/${{ inputs.scope }}.tfvars" \
               -out=tfplan
           fi
 
@@ -67,14 +66,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ inputs.env }}-${{ inputs.scope }}
-          path: environments/tfplan
+          path: environments/${{ env.SCOPE_DIR }}/tfplan
           retention-days: 1
 
   apply:
     name: "Terraform Apply (${{ inputs.env }} / ${{ inputs.scope }})"
     needs: plan
     runs-on: ubuntu-latest
-
     environment: apply
 
     env:
@@ -84,29 +82,31 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets[format('SDLC_{0}_AZURE_SUBSCRIPTION_ID_TERRAFORM', inputs.env)] }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
 
-      - name: Set lowercase env
-        run: echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Set env vars
+        run: |
+          echo "ENV_LOWER=$(echo '${{ inputs.env }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+          if [ "${{ inputs.scope }}" = "base" ] || [ "${{ inputs.scope }}" = "shared" ]; then
+            echo "SCOPE_DIR=${{ inputs.scope }}" >> $GITHUB_ENV
+          else
+            echo "SCOPE_DIR=dedicated" >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
-        working-directory: environments
-        run: |
-          terraform init \
-            -backend-config="key=${{ inputs.scope }}.tfstate"
+        working-directory: environments/${{ env.SCOPE_DIR }}
+        run: terraform init -backend-config="key=${{ inputs.scope }}.tfstate"
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ inputs.env }}-${{ inputs.scope }}
-          path: environments
+          path: environments/${{ env.SCOPE_DIR }}
 
       - name: Terraform Apply
-        working-directory: environments
+        working-directory: environments/${{ env.SCOPE_DIR }}
         run: terraform apply -auto-approve tfplan

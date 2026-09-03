@@ -1,27 +1,21 @@
-# --- Dedicated scope resources ---
-# One set of resources per dedicated tenant, named by resource_code (SHA256(github_org)[:8]).
-# All names follow the pattern: {resource}-sdlc-{resource_code}-{env}
-#
+# --- Shared scope resources ---
+# Shared data plane — used by all tier=shared tenants.
+# All names follow the pattern: {resource}-sdlc-shared-{env}
 # Apply with: terraform apply -var-file=environments/{env}/common.tfvars
-#                             -var-file=environments/{env}/{resource_code}.tfvars
-#                             -backend-config="key={resource_code}.tfstate"
-#
-# Each dedicated tenant gets their own {resource_code}.tfvars with:
-#   resource_code        = "a3f1c2b4"
-#   vnet_cidr            = "10.2.0.0/16"
-#   endpoint_subnet_cidr = "10.2.1.0/24"
+#                             -var-file=environments/{env}/shared.tfvars
+#                             -backend-config="key=shared.tfstate"
 
 module "resource_group" {
-  source   = "../modules/resource-group"
-  scope    = var.resource_code
+  source   = "../../modules/resource-group"
+  scope    = "shared"
   env      = var.env
   location = var.location
   tags     = var.tags
 }
 
 module "vnet" {
-  source              = "../modules/vnet"
-  scope               = var.resource_code
+  source              = "../../modules/vnet"
+  scope               = "shared"
   env                 = var.env
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -30,7 +24,8 @@ module "vnet" {
 
   subnets = {
     # Reserved for private endpoints — no delegation required.
-    "snet-sdlc-${var.resource_code}-${var.env}-endpoints" = {
+    # Public access is enabled for dev; private endpoints use this subnet in production.
+    "snet-sdlc-shared-${var.env}-endpoints" = {
       address_prefix = var.endpoint_subnet_cidr
       delegation     = null
     }
@@ -38,8 +33,8 @@ module "vnet" {
 }
 
 module "managed_identity" {
-  source              = "../modules/managed-identity"
-  scope               = var.resource_code
+  source              = "../../modules/managed-identity"
+  scope               = "shared"
   env                 = var.env
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -47,8 +42,8 @@ module "managed_identity" {
 }
 
 module "keyvault" {
-  source              = "../modules/keyvault"
-  scope               = var.resource_code
+  source              = "../../modules/keyvault"
+  scope               = "shared"
   env                 = var.env
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -57,8 +52,8 @@ module "keyvault" {
 }
 
 module "service_bus" {
-  source              = "../modules/service-bus"
-  scope               = var.resource_code
+  source              = "../../modules/service-bus"
+  scope               = "shared"
   env                 = var.env
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -68,8 +63,8 @@ module "service_bus" {
 }
 
 module "storage" {
-  source              = "../modules/storage"
-  scope               = var.resource_code
+  source              = "../../modules/storage"
+  scope               = "shared"
   env                 = var.env
   location            = var.location
   resource_group_name = module.resource_group.name
@@ -79,16 +74,17 @@ module "storage" {
 }
 
 # --- VNet Peering ---
-# Connects this tenant's dedicated VNet to the base VNet (control plane).
+# Lookup the base VNet so shared workers can communicate with the control-plane API.
+# Both directions must be created — Azure peering is not automatic in both directions.
 
 data "azurerm_virtual_network" "base" {
   name                = "vnet-sdlc-base-${var.env}"
   resource_group_name = "rg-sdlc-base-${var.env}"
 }
 
-# Peering: dedicated → base
-resource "azurerm_virtual_network_peering" "dedicated_to_base" {
-  name                      = "peer-${var.resource_code}-to-base"
+# Peering: shared → base
+resource "azurerm_virtual_network_peering" "shared_to_base" {
+  name                      = "peer-shared-to-base"
   resource_group_name       = module.resource_group.name
   virtual_network_name      = module.vnet.vnet_name
   remote_virtual_network_id = data.azurerm_virtual_network.base.id
@@ -97,9 +93,9 @@ resource "azurerm_virtual_network_peering" "dedicated_to_base" {
   allow_forwarded_traffic      = false
 }
 
-# Peering: base → dedicated
-resource "azurerm_virtual_network_peering" "base_to_dedicated" {
-  name                      = "peer-base-to-${var.resource_code}"
+# Peering: base → shared (created here so both sides are managed in one apply)
+resource "azurerm_virtual_network_peering" "base_to_shared" {
+  name                      = "peer-base-to-shared"
   resource_group_name       = "rg-sdlc-base-${var.env}"
   virtual_network_name      = "vnet-sdlc-base-${var.env}"
   remote_virtual_network_id = module.vnet.vnet_id
@@ -108,8 +104,8 @@ resource "azurerm_virtual_network_peering" "base_to_dedicated" {
   allow_forwarded_traffic      = false
 }
 
-# Grant the base managed identity Sender access to this tenant's Service Bus.
-# FastAPI (base) needs to enqueue messages on behalf of dedicated-tier tenants.
+# Grant the base managed identity Sender access to the shared Service Bus.
+# FastAPI (base) needs to enqueue messages on behalf of shared-tier tenants.
 data "azurerm_user_assigned_identity" "base" {
   name                = "id-sdlc-base-${var.env}"
   resource_group_name = "rg-sdlc-base-${var.env}"
