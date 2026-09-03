@@ -104,32 +104,6 @@ resource "azurerm_virtual_network_peering" "base_to_shared" {
   allow_forwarded_traffic      = false
 }
 
-# Grant the Terraform SP Secrets Officer on the shared Key Vault so it can
-# write the Redis primary key as a secret during apply.
-data "azurerm_client_config" "current" {}
-
-resource "azurerm_role_assignment" "terraform_keyvault" {
-  scope                = module.keyvault.vault_id
-  role_definition_name = "Key Vault Secrets Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
-}
-
-module "redis" {
-  source              = "../../../modules/redis"
-  scope               = "shared"
-  env                 = var.env
-  location            = var.location
-  resource_group_name = module.resource_group.name
-  key_vault_id        = module.keyvault.vault_id
-  tags                = var.tags
-
-  # C0 Basic — 250MB, sufficient for dev. Upgrade to Standard C1 for prod.
-  sku_name = "Basic"
-  family   = "C"
-  capacity = 0
-
-  depends_on = [azurerm_role_assignment.terraform_keyvault]
-}
 
 # Grant the base managed identity Sender access to the shared Service Bus.
 # FastAPI (base) needs to enqueue messages on behalf of shared-tier tenants.
