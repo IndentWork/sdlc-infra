@@ -118,15 +118,5 @@ resource "azurerm_role_assignment" "base_mi_servicebus_sender" {
   principal_id         = data.azurerm_user_assigned_identity.base.principal_id
 }
 
-# Grant the shared managed identity AcrPull on the base Container Registry.
-# Workers in the shared scope pull their Docker images from crsdlc{env} in base.
-data "azurerm_container_registry" "base" {
-  name                = "crsdlc${var.env}"
-  resource_group_name = "rg-sdlc-base-${var.env}"
-}
-
-resource "azurerm_role_assignment" "shared_mi_acr_pull" {
-  scope                = data.azurerm_container_registry.base.id
-  role_definition_name = "AcrPull"
-  principal_id         = module.managed_identity.principal_id
-}
+# Note: AcrPull role assignment for shared MI on base ACR (crsdlcdev)
+# is managed manually via CLI — already exists and not tracked by Terraform.
