@@ -10,12 +10,12 @@ output "namespace_name" {
   value       = azurerm_servicebus_namespace.this.name
 }
 
-output "repo_index_queue_id" {
-  description = "Resource ID of the repo-index queue."
-  value       = azurerm_servicebus_queue.repo_index.id
+output "topic_id" {
+  description = "Resource ID of the sdlc-events topic."
+  value       = azurerm_servicebus_topic.sdlc_events.id
 }
 
-output "repo_index_queue_name" {
-  description = "Name of the repo-index queue."
-  value       = azurerm_servicebus_queue.repo_index.name
+output "topic_name" {
+  description = "Name of the sdlc-events topic."
+  value       = azurerm_servicebus_topic.sdlc_events.name
 }
