@@ -120,3 +120,25 @@ resource "azurerm_role_assignment" "base_mi_servicebus_sender" {
 
 # Note: AcrPull role assignment for shared MI on base ACR is managed manually via CLI.
 # It's already in place and working — worker can pull images from crsdlcdev.
+
+module "cosmos" {
+  source              = "../../../modules/cosmos"
+  scope               = "shared"
+  env                 = var.env
+  location            = var.location
+  resource_group_name = module.resource_group.name
+  tags                = var.tags
+
+  managed_identity_principal_id = module.managed_identity.principal_id
+}
+
+module "ai_search" {
+  source              = "../../../modules/ai-search"
+  scope               = "shared"
+  env                 = var.env
+  location            = var.location
+  resource_group_name = module.resource_group.name
+  tags                = var.tags
+
+  managed_identity_principal_id = module.managed_identity.principal_id
+}

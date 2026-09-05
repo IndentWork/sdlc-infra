@@ -19,7 +19,7 @@ variable "resource_group_name" {
 }
 
 variable "managed_identity_principal_id" {
-  description = "Principal ID of the managed identity that will read/write Cosmos DB"
+  description = "Principal ID of the managed identity that will read/write AI Search"
   type        = string
 }
 
