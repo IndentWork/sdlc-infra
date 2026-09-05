@@ -37,6 +37,20 @@ resource "azurerm_role_assignment" "fastapi_keyvault" {
   principal_id         = module.managed_identity.principal_id
 }
 
+# Grant shared MI Key Vault Secrets User on base Key Vault.
+# Indexing worker (shared scope) reads GitHub App private key from base Key Vault.
+# shared MI principal_id is looked up here since it lives in the shared resource group.
+data "azurerm_user_assigned_identity" "shared" {
+  name                = "id-sdlc-shared-${var.env}"
+  resource_group_name = "rg-sdlc-shared-${var.env}"
+}
+
+resource "azurerm_role_assignment" "shared_mi_keyvault_secrets_user" {
+  scope                = module.keyvault.vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = data.azurerm_user_assigned_identity.shared.principal_id
+}
+
 # Grant Terraform SP Secrets Officer access so it can write secrets to Key Vault.
 data "azurerm_client_config" "current" {}
 
