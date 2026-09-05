@@ -33,17 +33,16 @@ resource "azurerm_storage_account" "this" {
   allow_nested_items_to_be_public = false
 }
 
-# Full agent traces, plans, tool outputs, reviewer feedback, token/cost detail.
-resource "azurerm_storage_container" "audit_logs" {
-  name                  = "audit-logs"
-  storage_account_name  = azurerm_storage_account.this.name
-  container_access_type = "private"
-}
-
-# Dormant workflow checkpoints — hot Redis state serialised to Blob after inactivity.
-# Restored when the human eventually responds and the workflow resumes.
-resource "azurerm_storage_container" "checkpoints" {
-  name                  = "checkpoints"
+# Single container for all platform data.
+# Path hierarchy inside: {resource_code}/{github_org}/{type}/...
+# Adding new data types = new path prefix, zero Terraform changes.
+#
+# Examples:
+#   {resource_code}/{github_org}/sdlc.yml
+#   {resource_code}/{github_org}/index/{project}/{repo}/{file}.json
+#   {resource_code}/{github_org}/audit/{...}
+resource "azurerm_storage_container" "sdlc" {
+  name                  = "sdlc"
   storage_account_name  = azurerm_storage_account.this.name
   container_access_type = "private"
 }
