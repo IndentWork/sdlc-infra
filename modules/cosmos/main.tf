@@ -56,7 +56,7 @@ resource "azurerm_cosmosdb_sql_container" "nodes" {
   resource_group_name = var.resource_group_name
   account_name        = azurerm_cosmosdb_account.this.name
   database_name       = azurerm_cosmosdb_sql_database.sdlc.name
-  partition_key_path  = "/resource_code"
+  partition_key_paths = ["/resource_code"]
 }
 
 # edges container — stores relationships (CALLS, IMPORTS, HAS_METHOD)
@@ -65,7 +65,7 @@ resource "azurerm_cosmosdb_sql_container" "edges" {
   resource_group_name = var.resource_group_name
   account_name        = azurerm_cosmosdb_account.this.name
   database_name       = azurerm_cosmosdb_sql_database.sdlc.name
-  partition_key_path  = "/resource_code"
+  partition_key_paths = ["/resource_code"]
 }
 
 # Grant managed identity read/write access — no keys needed
