@@ -58,12 +58,12 @@ az servicebus topic subscription rule create \
   --topic-name "$TOPIC_NAME" \
   --subscription-name "indexing" \
   --name "indexing-action-filter" \
-  --filter-sql-expression "action = 'upload_sdlc'" 2>/dev/null || echo "  (already exists)"
+  --filter-sql-expression "action = 'index_repos'" 2>/dev/null || echo "  (already exists)"
 
 echo "✅ Service Bus subscriptions ready"
 echo ""
 echo "Topic: $TOPIC_NAME"
 echo "Subscriptions:"
 echo "  tester   — action = 'test_storage' OR action = 'upload_sdlc'"
-echo "  indexing — action = 'upload_sdlc'"
+echo "  indexing — action = 'index_repos'"
 echo "Environment: $ENV"
