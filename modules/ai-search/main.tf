@@ -26,8 +26,7 @@ resource "azurerm_search_service" "this" {
   tags                = var.tags
 
   # Disable key-based auth — Managed Identity only
-  local_authentication_enabled  = false
-  authentication_failure_mode   = "http403"
+  local_authentication_enabled = false
 }
 
 # Grant managed identity Search Index Data Contributor role
